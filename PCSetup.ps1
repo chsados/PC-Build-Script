@@ -6,7 +6,7 @@ function SetPCName {
     #$AssetID = [Microsoft.VisualBasic.Interaction]::InputBox('Enter a Asset ID', 'Asset ID')
     #Write-Output "The asset ID is $AssetID"
     #Write-Output "$DeviceType-$CompanyName-$AssetID"
-    Rename-Computer -NewName "RENAME-ME"
+    #Rename-Computer -NewName "RENAME-ME"
 }
 
 function InstallChoco {
