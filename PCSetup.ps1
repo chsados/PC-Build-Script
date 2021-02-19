@@ -1,42 +1,51 @@
 Set-ExecutionPolicy remotesigned
+# Begin by creating the various functions which will be called at the end of the script. You can create additional functions if needed.
 function SetPCName {
-    #Add-Type -AssemblyName Microsoft.VisualBasic
-    #$DeviceType = [Microsoft.VisualBasic.Interaction]::InputBox('Enter Device Type (LT or DT)', 'Device Type')
-    #$CompanyName = [Microsoft.VisualBasic.Interaction]::InputBox('Enter Company Initials (Max 4 letters)', 'Company Initials')
-    #$AssetID = [Microsoft.VisualBasic.Interaction]::InputBox('Enter a Asset ID', 'Asset ID')
-    #Write-Output "The asset ID is $AssetID"
-    #Write-Output "$DeviceType-$CompanyName-$AssetID"
-    #Rename-Computer -NewName "RENAME-ME"
+    # In our MSP we designate all systems in the format devicetype-companyname-assetid for example DT-MSP-000001 keep in mind that this is the maximum length Windows allows for system names
+    # This function creates VisualBasic pop-up prompts which ask for this information to be input. You can hange these as needed to suite your MSP
+    Add-Type -AssemblyName Microsoft.VisualBasic
+    #$DeviceType = [Microsoft.VisualBasic.Interaction]::InputBox('Enter Company Kaseya Abbreviation (BLFR or BSO)', 'Device Type')
+    $CompanyName = [Microsoft.VisualBasic.Interaction]::InputBox('Enter Company Kaseya Abbreviation (Example: BLFR or BSO)', 'Company Initials')
+    $AssetID = [Microsoft.VisualBasic.Interaction]::InputBox('Enter Computer Number (L01 or S10)', 'Asset ID')
+    Write-Output "The Compupter Number is $AssetID"
+    Write-Output "$CompanyName-$AssetID"
+    Rename-Computer -NewName "$CompanyName-$AssetID"
 }
 
 function InstallChoco {
-            # Ask for elevated permissions if required
+    # Ask for elevated permissions if required
     If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
         Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
         Exit
-    }    
+        }
+    # Install Chocolatey to allow automated installation of packages  
     Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+    }
+
+function InstallApps {
+    # Install the first set of applications. these are quick so ive added them separately
     choco install adobereader 7zip microsoft-edge -y
+    # Install Office365 applications. This takes a while so is done separately. You can change the options here by following the instructions here: https://chocolatey.org/packages/microsoft-office-deployment
     choco install microsoft-office-deployment --params="'/Channel:Monthly /Language:en-us /64bit /Product:O365BusinessRetail /Exclude:Lync,Groove'" -y
+    #choco install microsoft-office-deployment --params="'/Channel:Monthly /Language:en-us /Product:O365BusinessRetail /Exclude:Lync,Groove'" -y
 }
 
 function ReclaimWindows10 {
-
-        # Ask for elevated permissions if required
+    # Ask for elevated permissions if required
     If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
         Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
         Exit
     }
 
 
-
+    # Massive deployment section. There are stacks of customization options here. Un-hash the ones your want to apply.
     ##########
     # Privacy Settings
     ##########
 
     # Disable Telemetry
-    Write-Host "Disabling Telemetry..."
-    Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Type DWord -Value 0
+    #Write-Host "Disabling Telemetry..."
+    #Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Type DWord -Value 0
 
     # Enable Telemetry
     # Remove-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry"
@@ -63,16 +72,16 @@ function ReclaimWindows10 {
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\AppHost" -Name "EnableWebContentEvaluation"
 
     # Disable Bing Search in Start Menu
-    Write-Host "Disabling Bing Search in Start Menu..."
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled" -Type DWord -Value 0
+    # Write-Host "Disabling Bing Search in Start Menu..."
+    # Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled" -Type DWord -Value 0
 
     # Enable Bing Search in Start Menu
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "BingSearchEnabled"
 
     # Disable Location Tracking
-    Write-Host "Disabling Location Tracking..."
-    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Sensor\Overrides\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}" -Name "SensorPermissionState" -Type DWord -Value 0
-    Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Services\lfsvc\Service\Configuration" -Name "Status" -Type DWord -Value 0
+    # Write-Host "Disabling Location Tracking..."
+    # Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Sensor\Overrides\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}" -Name "SensorPermissionState" -Type DWord -Value 0
+    # Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Services\lfsvc\Service\Configuration" -Name "Status" -Type DWord -Value 0
 
     # Enable Location Tracking
     # Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Sensor\Overrides\{BFA794E4-F964-4FDB-90F6-51056BFE4B44}" -Name "SensorPermissionState" -Type DWord -Value 1
@@ -99,20 +108,21 @@ function ReclaimWindows10 {
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo" -Name "Enabled"
 
     # Disable Cortana
-    Write-Host "Disabling Cortana..."
-    If (!(Test-Path "HKCU:\Software\Microsoft\Personalization\Settings")) {
-        New-Item -Path "HKCU:\Software\Microsoft\Personalization\Settings" -Force | Out-Null
-    }
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Personalization\Settings" -Name "AcceptedPrivacyPolicy" -Type DWord -Value 0
-    If (!(Test-Path "HKCU:\Software\Microsoft\InputPersonalization")) {
-        New-Item -Path "HKCU:\Software\Microsoft\InputPersonalization" -Force | Out-Null
-    }
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\InputPersonalization" -Name "RestrictImplicitTextCollection" -Type DWord -Value 1
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\InputPersonalization" -Name "RestrictImplicitInkCollection" -Type DWord -Value 1
-    If (!(Test-Path "HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore")) {
-        New-Item -Path "HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore" -Force | Out-Null
-    }
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore" -Name "HarvestContacts" -Type DWord -Value 0
+    # Write-Host "Disabling Cortana..."
+    # If (!(Test-Path "HKCU:\Software\Microsoft\Personalization\Settings")) {
+    #    New-Item -Path "HKCU:\Software\Microsoft\Personalization\Settings" -Force | Out-Null
+    #}
+    
+	#Set-ItemProperty -Path "HKCU:\Software\Microsoft\Personalization\Settings" -Name "AcceptedPrivacyPolicy" -Type DWord -Value 0
+    #If (!(Test-Path "HKCU:\Software\Microsoft\InputPersonalization")) {
+    #    New-Item -Path "HKCU:\Software\Microsoft\InputPersonalization" -Force | Out-Null
+    #}
+    #Set-ItemProperty -Path "HKCU:\Software\Microsoft\InputPersonalization" -Name "RestrictImplicitTextCollection" -Type DWord -Value 1
+    #Set-ItemProperty -Path "HKCU:\Software\Microsoft\InputPersonalization" -Name "RestrictImplicitInkCollection" -Type DWord -Value 1
+    #If (!(Test-Path "HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore")) {
+    #    New-Item -Path "HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore" -Force | Out-Null
+    #}
+    #Set-ItemProperty -Path "HKCU:\Software\Microsoft\InputPersonalization\TrainedDataStore" -Name "HarvestContacts" -Type DWord -Value 0
 
     # Enable Cortana
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Personalization\Settings" -Name "AcceptedPrivacyPolicy"
@@ -219,8 +229,8 @@ function ReclaimWindows10 {
     # Start-Service "HomeGroupProvider"
 
     # Disable Remote Assistance
-    # Write-Host "Disabling Remote Assistance..."
-    # Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Remote Assistance" -Name "fAllowToGetHelp" -Type DWord -Value 0
+     Write-Host "Disabling Remote Assistance..."
+     Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Remote Assistance" -Name "fAllowToGetHelp" -Type DWord -Value 0
 
     # Enable Remote Assistance
     # Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Remote Assistance" -Name "fAllowToGetHelp" -Type DWord -Value 1
@@ -241,12 +251,12 @@ function ReclaimWindows10 {
     ##########
 
     # Disable Action Center
-    Write-Host "Disabling Action Center..."
-    If (!(Test-Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer")) {
-      New-Item -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" | Out-Null
-    }
-    Set-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" -Name "DisableNotificationCenter" -Type DWord -Value 1
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications" -Name "ToastEnabled" -Type DWord -Value 0
+    #Write-Host "Disabling Action Center..."
+    #If (!(Test-Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer")) {
+    #  New-Item -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" | Out-Null
+    #}
+    #Set-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" -Name "DisableNotificationCenter" -Type DWord -Value 1
+    #Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications" -Name "ToastEnabled" -Type DWord -Value 0
 
     # Enable Action Center
     # Remove-ItemProperty -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" -Name "DisableNotificationCenter"
@@ -263,18 +273,18 @@ function ReclaimWindows10 {
     # Remove-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\Personalization" -Name "NoLockScreen"
 
     # Disable Autoplay
-    Write-Host "Disabling Autoplay..."
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers" -Name "DisableAutoplay" -Type DWord -Value 1
+    # Write-Host "Disabling Autoplay..."
+    # Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers" -Name "DisableAutoplay" -Type DWord -Value 1
 
     # Enable Autoplay
     # Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\AutoplayHandlers" -Name "DisableAutoplay" -Type DWord -Value 0
 
     # Disable Autorun for all drives
-     Write-Host "Disabling Autorun for all drives..."
-     If (!(Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer")) {
-       New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" | Out-Null
-    }
-     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoDriveTypeAutoRun" -Type DWord -Value 255
+    # Write-Host "Disabling Autorun for all drives..."
+    # If (!(Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer")) {
+    #	New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" | Out-Null
+    #}
+    # Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoDriveTypeAutoRun" -Type DWord -Value 255
 
     # Enable Autorun
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoDriveTypeAutoRun"
@@ -294,15 +304,15 @@ function ReclaimWindows10 {
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode"
 
     # Hide Task View button
-    Write-Host "Hiding Task View button..."
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Type DWord -Value 0
+    # Write-Host "Hiding Task View button..."
+    # Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Type DWord -Value 0
 
     # Show Task View button
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton"
 
     # Show small icons in taskbar
-    # Write-Host "Showing small icons in taskbar..."
-    # Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarSmallIcons" -Type DWord -Value 1
+     Write-Host "Showing small icons in taskbar..."
+     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarSmallIcons" -Type DWord -Value 1
 
     # Show large icons in taskbar
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarSmallIcons"
@@ -329,7 +339,7 @@ function ReclaimWindows10 {
     # Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideFileExt" -Type DWord -Value 1
 
     # Show hidden files
-    #Write-Host "Showing hidden files..."
+    # Write-Host "Showing hidden files..."
     #Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Hidden" -Type DWord -Value 1
 
     # Hide hidden files
@@ -343,12 +353,12 @@ function ReclaimWindows10 {
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "LaunchTo"
 
     # Show Computer shortcut on desktop
-    Write-Host "Showing Computer shortcut on desktop..."
-    If (!(Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu")) {
-      New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu" | Out-Null
-    }
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu" -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Type DWord -Value 0
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Type DWord -Value 0
+     Write-Host "Showing Computer shortcut on desktop..."
+     If (!(Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu")) {
+       New-Item -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu" | Out-Null
+     }
+     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu" -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Type DWord -Value 0
+     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Type DWord -Value 0
 
     # Hide Computer shortcut from desktop
     # Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu" -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}"
@@ -474,7 +484,7 @@ function ReclaimWindows10 {
     Get-AppxPackage "Microsoft.MicrosoftOfficeHub" | Remove-AppxPackage
     Get-AppxPackage "Microsoft.MicrosoftSolitaireCollection" | Remove-AppxPackage
     # Get-AppxPackage "Microsoft.Office.OneNote" | Remove-AppxPackage
-    Get-AppxPackage "Microsoft.People" | Remove-AppxPackage
+    # Get-AppxPackage "Microsoft.People" | Remove-AppxPackage
     # Get-AppxPackage "Microsoft.SkypeApp" | Remove-AppxPackage
     Get-AppxPackage "Microsoft.Windows.Photos" | Remove-AppxPackage
     Get-AppxPackage "Microsoft.WindowsAlarms" | Remove-AppxPackage
@@ -587,15 +597,20 @@ function ReclaimWindows10 {
 
     }
 
+# Uploads a default layout to all NEW users that log into the system. Effects task bar and start menu
 function LayoutDesign {
     If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
         Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
         Exit
     }
     Import-StartLayout -LayoutPath "c:\build\PC-Build-Script-master\LayoutModification.xml" -MountPath $env:SystemDrive\
+    }
+    
+function ApplyDefaultApps {
     dism /online /Import-DefaultAppAssociations:c:\build\PC-Build-Script-master\AppAssociations.xml
 }
 
+# Custom power profile used for our customers. Ensures systems do not go to sleep.
 function IntechPower {
     POWERCFG -DUPLICATESCHEME 381b4222-f694-41f0-9685-ff5bb260df2e 381b4222-f694-41f0-9685-ff5bb260aaaa
     POWERCFG -CHANGENAME 381b4222-f694-41f0-9685-ff5bb260aaaa "Intech Power Management"
@@ -621,9 +636,17 @@ function RestartPC{
     Restart-Computer
 }
 
+function Branding{
+Invoke-WebRequest -Uri "https://downloads.pacit.tech/intechlogo.bmp" -OutFile "c:\windows\system32\intechlogo.bmp"
+New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\OEMInformation" -Name "Manufacturer" -Value "Intech I.T. Solutions Ltd"  -PropertyType "String" -Force
+}
+
 InstallChoco
-SetPCName
-LayoutDesign
-ReclaimWindows10
+InstallApps
+#ReclaimWindows10
+#LayoutDesign
+#ApplyDefaultApps
 IntechPower
+Branding
+#SetPCName
 RestartPC
